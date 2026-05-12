@@ -1,0 +1,20 @@
+{
+  "_comment": "Maps inbound email -> Jira Service Management organization. Lookup is case-insensitive. byEmail wins over byDomain. Get orgId from: GET /rest/servicedeskapi/organization",
+  "byEmail": {
+    "jane.doe@barclay-charlottesville.com": {
+      "orgId": "10",
+      "name": "Barclay of Charlottesville",
+      "displayName": "Jane Doe"
+    }
+  },
+  "byDomain": {
+    "barclay-charlottesville.com": {
+      "orgId": "10",
+      "name": "Barclay of Charlottesville"
+    },
+    "glenncrest-siegen.com": {
+      "orgId": "11",
+      "name": "Glenncrest at Siegen"
+    }
+  }
+}
