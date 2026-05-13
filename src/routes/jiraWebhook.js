@@ -8,14 +8,6 @@ import { env } from '../config.js'
 
 const router = express.Router()
 
-// Test endpoint for Postman / smoke checks.
-// GET http://<host>:<port>/jira-webhook/hello → prints to the server console
-// and responds with "hello world".
-router.get('/hello', (_req, res) => {
-  console.log('hello world')
-  res.status(200).type('text/plain').send('hello world')
-})
-
 router.post('/', async (req, res) => {
   if (req.get('x-webhook-secret') !== env.jira.webhookSecret) {
     audit({
