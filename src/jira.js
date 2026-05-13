@@ -3,16 +3,27 @@ import { env } from './config.js'
 const auth = () =>
   'Basic ' + Buffer.from(`${env.jira.email}:${env.jira.token}`).toString('base64')
 
+const JIRA_TIMEOUT_MS = Number(process.env.JIRA_TIMEOUT_MS) || 30000
+
 async function jiraFetch(path, opts = {}) {
-  const res = await fetch(`${env.jira.baseUrl}${path}`, {
-    ...opts,
-    headers: {
-      Authorization: auth(),
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      ...(opts.headers || {}),
-    },
-  })
+  let res
+  try {
+    res = await fetch(`${env.jira.baseUrl}${path}`, {
+      ...opts,
+      headers: {
+        Authorization: auth(),
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        ...(opts.headers || {}),
+      },
+      signal: AbortSignal.timeout(JIRA_TIMEOUT_MS),
+    })
+  } catch (err) {
+    if (err.name === 'TimeoutError' || err.name === 'AbortError') {
+      throw new Error(`Jira request timeout after ${JIRA_TIMEOUT_MS}ms ${opts.method || 'GET'} ${path}`)
+    }
+    throw new Error(`Jira network error ${opts.method || 'GET'} ${path}: ${err.message}`)
+  }
 
   if (!res.ok) {
     const body = await res.text().catch(() => '')
@@ -83,9 +94,6 @@ export async function getIssue(issueKey) {
 }
 
 export async function addOrganizationToIssue(issueKey, organizationId) {
-  // "Organization" field is a multi-select customfield. Find its id with:
-  //   GET /rest/api/3/field
-  // then PUT it on the issue. Hardcoded here as customfield_10002 (the common default).
   return jiraFetch(`/rest/api/3/issue/${issueKey}`, {
     method: 'PUT',
     body: JSON.stringify({

@@ -12,6 +12,7 @@ import { isMessageProcessed, markMessageProcessed, audit } from '../db.js'
 import { render } from '../templates.js'
 import { sendMail } from '../mailer.js'
 import { env } from '../config.js'
+import { firstNameFrom } from '../names.js'
 
 export async function handleInbound(parsed) {
   const messageId = parsed.messageId
@@ -119,7 +120,7 @@ export async function handleInbound(parsed) {
   try {
     const tpl = render('ticket_received', {
       ticketKey,
-      customerName: fromName,
+      customerName: firstNameFrom(fromName, fromAddr),
       summary: subject,
     })
     await sendMail({

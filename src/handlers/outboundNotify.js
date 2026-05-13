@@ -1,6 +1,7 @@
 import { render } from '../templates.js'
 import { sendMail } from '../mailer.js'
 import { audit } from '../db.js'
+import { firstNameFrom } from '../names.js'
 
 const STATUS_TEMPLATE = {
   'Needs Assigned': 'ticket_received',
@@ -40,7 +41,7 @@ export async function handleStatusChange({
 
   const tpl = render(tplName, {
     ticketKey,
-    customerName: reporterName || reporterEmail,
+    customerName: firstNameFrom(reporterName, reporterEmail),
     summary,
     latestComment: latestComment || '',
   })
@@ -79,10 +80,10 @@ export async function handleAgentComment({
 
   const tpl = render('agent_reply', {
     ticketKey,
-    customerName: reporterName || reporterEmail,
+    customerName: firstNameFrom(reporterName, reporterEmail),
     summary,
     commentBody,
-    commentAuthor: commentAuthor || 'CachedTech Support',
+    commentAuthor: commentAuthor || 'Cached Technology Support',
   })
 
   await sendMail({
