@@ -18,6 +18,7 @@ if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true })
 
 const messagesFile = path.join(dataDir, 'processed-messages.jsonl')
 const webhooksFile = path.join(dataDir, 'processed-webhooks.jsonl')
+const confirmationsFile = path.join(dataDir, 'sent-confirmations.jsonl')
 const auditFile = path.join(dataDir, 'audit.log.jsonl')
 
 function loadIds(file) {
@@ -42,6 +43,7 @@ function loadIds(file) {
 // so there's no cross-process cache invalidation problem.
 let messagesCache = null
 let webhooksCache = null
+let confirmationsCache = null
 
 function getMessages() {
   if (messagesCache === null) messagesCache = loadIds(messagesFile)
@@ -51,6 +53,11 @@ function getMessages() {
 function getWebhooks() {
   if (webhooksCache === null) webhooksCache = loadIds(webhooksFile)
   return webhooksCache
+}
+
+function getConfirmations() {
+  if (confirmationsCache === null) confirmationsCache = loadIds(confirmationsFile)
+  return confirmationsCache
 }
 
 export const isMessageProcessed = (id) => getMessages().has(id)
@@ -77,6 +84,27 @@ export const markWebhookProcessed = (id) => {
     JSON.stringify({ id, ts: Date.now() }) + '\n'
   )
   set.add(id)
+}
+
+/**
+ * Tracks "we've already sent the ticket_received email for this ticket".
+ * The inbound-email path marks it when it creates a ticket; the webhook
+ * path checks it before sending so the customer doesn't get the same
+ * confirmation twice when both paths fire (Jira automation fires Issue
+ * Created even for tickets the middleware created itself).
+ */
+export const wasConfirmationSent = (ticketKey) =>
+  ticketKey ? getConfirmations().has(ticketKey) : false
+
+export const markConfirmationSent = (ticketKey) => {
+  if (!ticketKey) return
+  const set = getConfirmations()
+  if (set.has(ticketKey)) return
+  fs.appendFileSync(
+    confirmationsFile,
+    JSON.stringify({ id: ticketKey, ts: Date.now() }) + '\n'
+  )
+  set.add(ticketKey)
 }
 
 export const audit = ({ direction, ticketKey, subject, status, detail } = {}) => {

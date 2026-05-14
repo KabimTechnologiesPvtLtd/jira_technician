@@ -4,11 +4,11 @@ import {
   createCustomer,
   createServiceDeskRequest,
   addPublicComment,
-  addInternalComment,
   addOrganizationToIssue,
+  addLabels,
 } from '../jira.js'
 import { findOrgForEmail } from '../orgMapping.js'
-import { isMessageProcessed, markMessageProcessed, audit } from '../db.js'
+import { isMessageProcessed, markMessageProcessed, markConfirmationSent, audit } from '../db.js'
 import { render } from '../templates.js'
 import { sendMail } from '../mailer.js'
 import { env } from '../config.js'
@@ -98,25 +98,27 @@ export async function handleInbound(parsed) {
   markMessageProcessed(messageId, ticketKey)
 
   // ----- Org auto-assignment -----
+  // On failure or missing mapping, add a label instead of an internal comment.
+  // Labels stay out of the customer-facing comment stream and out of the
+  // {{issue.comments.last.body}} payload that drives status-change emails.
   const org = findOrgForEmail(fromAddr)
   if (org?.orgId) {
     try {
       await addOrganizationToIssue(ticketKey, org.orgId)
     } catch (err) {
       console.warn('[inbound] org assignment failed for', ticketKey, err.message)
-      await addInternalComment(
-        ticketKey,
-        `Auto-assignment to organization ${org.orgId} (${org.name || ''}) failed: ${err.message}`
-      ).catch(() => {})
+      await addLabels(ticketKey, 'needs-org-assignment').catch(() => {})
     }
   } else {
-    await addInternalComment(
-      ticketKey,
-      `No organization mapping found for ${fromAddr}. Please assign manually and add the mapping in data/org-mapping.json.`
-    ).catch(() => {})
+    console.warn('[inbound] no org mapping for', fromAddr, '- flagged with label')
+    await addLabels(ticketKey, 'needs-org-assignment').catch(() => {})
   }
 
   // ----- Confirmation email -----
+  // Mark BEFORE sending so the Jira "Issue Created" webhook (which fires
+  // in parallel) sees this ticket as already-confirmed and skips, even
+  // if it arrives before the SMTP send below completes.
+  markConfirmationSent(ticketKey)
   try {
     const tpl = render('ticket_received', {
       ticketKey,

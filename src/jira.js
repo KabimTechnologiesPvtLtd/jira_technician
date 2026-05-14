@@ -101,3 +101,18 @@ export async function addOrganizationToIssue(issueKey, organizationId) {
     }),
   })
 }
+
+/**
+ * Add labels to an issue without removing existing ones.
+ * Used to flag tickets that need triage without polluting the comment stream.
+ */
+export async function addLabels(issueKey, labels) {
+  const arr = (Array.isArray(labels) ? labels : [labels]).filter(Boolean)
+  if (arr.length === 0) return
+  return jiraFetch(`/rest/api/3/issue/${issueKey}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      update: { labels: arr.map((label) => ({ add: label })) },
+    }),
+  })
+}

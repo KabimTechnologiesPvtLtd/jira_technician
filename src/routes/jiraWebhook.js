@@ -27,7 +27,6 @@ router.post('/', async (req, res) => {
     summary,
     reporterEmail,
     reporterName,
-    latestComment,
     commentBody,
     commentAuthor,
   } = payload
@@ -62,7 +61,6 @@ router.post('/', async (req, res) => {
         summary,
         reporterEmail,
         reporterName,
-        latestComment,
       })
     }
 

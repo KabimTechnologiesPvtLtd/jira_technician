@@ -1,6 +1,6 @@
 import { render } from '../templates.js'
 import { sendMail } from '../mailer.js'
-import { audit } from '../db.js'
+import { audit, wasConfirmationSent, markConfirmationSent } from '../db.js'
 import { firstNameFrom } from '../names.js'
 
 const STATUS_TEMPLATE = {
@@ -19,7 +19,6 @@ export async function handleStatusChange({
   summary,
   reporterEmail,
   reporterName,
-  latestComment,
 }) {
   const tplName = STATUS_TEMPLATE[status]
   if (!tplName) {
@@ -39,11 +38,21 @@ export async function handleStatusChange({
     return { skipped: true, reason: 'no reporter email' }
   }
 
+  // Dedupe: if the inbound-email path already sent the ticket_received
+  // for this ticket, don't send it again from the Issue-Created webhook.
+  if (tplName === 'ticket_received' && wasConfirmationSent(ticketKey)) {
+    audit({
+      direction: 'out',
+      ticketKey,
+      status: 'notify:skipped:already-sent',
+    })
+    return { skipped: true, reason: 'confirmation already sent' }
+  }
+
   const tpl = render(tplName, {
     ticketKey,
     customerName: firstNameFrom(reporterName, reporterEmail),
     summary,
-    latestComment: latestComment || '',
   })
 
   await sendMail({
@@ -52,6 +61,10 @@ export async function handleStatusChange({
     text: tpl.body,
     ticketKey,
   })
+
+  if (tplName === 'ticket_received') {
+    markConfirmationSent(ticketKey)
+  }
 
   audit({
     direction: 'out',
