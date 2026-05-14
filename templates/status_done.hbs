@@ -6,7 +6,12 @@ Good news - your request has been resolved and the ticket is now marked complete
 
   Ticket:  {{ticketKey}}
   Subject: {{summary}}
-  Status:  Done
+  Status:  Completed
+
+{{#if latestComment}}
+Resolution notes from your technician:
+
+{{latestComment}}
 
 {{/if}}
 If everything is working as expected, no action is needed on your end.
