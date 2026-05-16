@@ -13,12 +13,53 @@ const STATUS_TEMPLATE = {
   Canceled: 'status_cancelled',
 }
 
+/**
+ * Decide who a customer-facing email goes to.
+ *
+ * Primary recipient is the assigned Contact (the on-site person the ticket is
+ * actually for). The Reporter is usually a dispatcher (e.g. Jimmy) who logs
+ * tickets on behalf of many sites, so they're CC'd to stay in the loop.
+ *
+ * When no Contact is assigned yet (fresh ticket, or unknown sender) we fall
+ * back to the reporter so the customer still hears back.
+ */
+function resolveRecipients({
+  contactEmail,
+  contactName,
+  reporterEmail,
+  reporterName,
+}) {
+  const contact = (contactEmail || '').trim()
+  const reporter = (reporterEmail || '').trim()
+
+  if (contact) {
+    const cc =
+      reporter && reporter.toLowerCase() !== contact.toLowerCase()
+        ? reporter
+        : undefined
+    return {
+      to: contact,
+      cc,
+      greetingName: firstNameFrom(contactName, contact),
+    }
+  }
+
+  // No contact assigned — send to whoever raised the ticket.
+  return {
+    to: reporter || undefined,
+    cc: undefined,
+    greetingName: firstNameFrom(reporterName, reporter),
+  }
+}
+
 export async function handleStatusChange({
   ticketKey,
   status,
   summary,
   reporterEmail,
   reporterName,
+  contactEmail,
+  contactName,
 }) {
   const tplName = STATUS_TEMPLATE[status]
   if (!tplName) {
@@ -29,13 +70,21 @@ export async function handleStatusChange({
     })
     return { skipped: true, reason: 'no template for status' }
   }
-  if (!reporterEmail) {
+
+  const { to, cc, greetingName } = resolveRecipients({
+    contactEmail,
+    contactName,
+    reporterEmail,
+    reporterName,
+  })
+
+  if (!to) {
     audit({
       direction: 'out',
       ticketKey,
       status: 'notify:skipped:no-email',
     })
-    return { skipped: true, reason: 'no reporter email' }
+    return { skipped: true, reason: 'no recipient email' }
   }
 
   // Dedupe: if the inbound-email path already sent the ticket_received
@@ -51,12 +100,13 @@ export async function handleStatusChange({
 
   const tpl = render(tplName, {
     ticketKey,
-    customerName: firstNameFrom(reporterName, reporterEmail),
+    customerName: greetingName,
     summary,
   })
 
   await sendMail({
-    to: reporterEmail,
+    to,
+    cc,
     subject: tpl.subject,
     text: tpl.body,
     ticketKey,
@@ -71,9 +121,10 @@ export async function handleStatusChange({
     ticketKey,
     subject: tpl.subject,
     status: `notify:${status}`,
+    detail: cc ? `to=${to} cc=${cc}` : `to=${to}`,
   })
 
-  return { sent: true }
+  return { sent: true, to, cc }
 }
 
 export async function handleAgentComment({
@@ -81,11 +132,20 @@ export async function handleAgentComment({
   summary,
   reporterEmail,
   reporterName,
+  contactEmail,
+  contactName,
   commentBody,
   commentAuthor,
 }) {
-  if (!reporterEmail) {
-    return { skipped: true, reason: 'no reporter email' }
+  const { to, cc, greetingName } = resolveRecipients({
+    contactEmail,
+    contactName,
+    reporterEmail,
+    reporterName,
+  })
+
+  if (!to) {
+    return { skipped: true, reason: 'no recipient email' }
   }
   if (!commentBody || !commentBody.trim()) {
     return { skipped: true, reason: 'empty comment' }
@@ -93,14 +153,15 @@ export async function handleAgentComment({
 
   const tpl = render('agent_reply', {
     ticketKey,
-    customerName: firstNameFrom(reporterName, reporterEmail),
+    customerName: greetingName,
     summary,
     commentBody,
     commentAuthor: commentAuthor || 'Cached Technology Support',
   })
 
   await sendMail({
-    to: reporterEmail,
+    to,
+    cc,
     subject: tpl.subject,
     text: tpl.body,
     ticketKey,
@@ -111,7 +172,8 @@ export async function handleAgentComment({
     ticketKey,
     subject: tpl.subject,
     status: 'notify:comment',
+    detail: cc ? `to=${to} cc=${cc}` : `to=${to}`,
   })
 
-  return { sent: true }
+  return { sent: true, to, cc }
 }

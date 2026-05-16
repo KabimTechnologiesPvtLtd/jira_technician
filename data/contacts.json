@@ -1,0 +1,15 @@
+{
+  "_comment": "Contacts database (Jira Standard plan has no place for phone/position, so it lives here). Keyed by Jira Service Management organization id - the same orgId used in org-mapping.json. Exactly one contact per org should have isPrimary:true; that person becomes the To: recipient on all ticket emails for that org, with the original email sender (Jira reporter) moved to Cc. Get orgId from: GET /rest/servicedeskapi/organization",
+  "byOrgId": {
+    "10": [
+      {
+        "firstName": "Jane",
+        "lastName": "Davis",
+        "email": "jane.davis@barclay-charlottesville.com",
+        "phone": "+1-555-0100",
+        "position": "Facilities Manager",
+        "isPrimary": true
+      }
+    ]
+  }
+}

@@ -58,8 +58,7 @@ For **status transitions**, configure a "Send web request" action with:
   "status": "{{issue.status.name}}",
   "summary": "{{issue.summary}}",
   "reporterEmail": "{{reporter.emailAddress}}",
-  "reporterName": "{{reporter.displayName}}",
-  "latestComment": "{{issue.comments.last.body}}"
+  "reporterName": "{{reporter.displayName}}"
 }
 ```
 

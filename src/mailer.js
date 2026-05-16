@@ -67,6 +67,7 @@ function buildHtml(textBody) {
 
 export async function sendMail({
   to,
+  cc,
   subject,
   text,
   html,
@@ -82,6 +83,7 @@ export async function sendMail({
   const message = {
     from: `"Cached Technology Support" <${env.zoho.user}>`,
     to,
+    ...(cc ? { cc } : {}),
     subject,
     text: text || undefined,
     html: html || buildHtml(text || ''),
