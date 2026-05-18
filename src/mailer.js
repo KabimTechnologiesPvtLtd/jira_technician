@@ -38,12 +38,32 @@ function escapeHtml(str) {
 }
 
 /**
+ * Convert plain-text template output to HTML that survives ALL mail clients.
+ * We deliberately do NOT rely on CSS white-space:pre-wrap — Outlook ignores
+ * it and collapses newlines/spaces. Emit explicit <br> per line and preserve
+ * leading indentation with &nbsp;.
+ */
+function textToHtml(textBody) {
+  return String(textBody || '')
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map((line) => {
+      const escaped = escapeHtml(line)
+      const indent = line.match(/^[ \t]+/)
+      if (!indent) return escaped
+      const pad = indent[0].replace(/\t/g, '    ').length
+      return '&nbsp;'.repeat(pad) + escaped.replace(/^[ \t]+/, '')
+    })
+    .join('<br>')
+}
+
+/**
  * Wrap a plain-text body in a branded HTML email shell with the logo at the bottom.
  * The original text is preserved inside a <pre>-styled block so formatting (line breaks,
  * indents in templates) stays intact.
  */
 function buildHtml(textBody) {
-  const escaped = escapeHtml(textBody || '')
+  const escaped = textToHtml(textBody)
   const logoBlock = hasLogo
     ? `
       <div style="margin-top:32px;padding-top:24px;border-top:1px solid #eaeaea;text-align:center;">
@@ -59,7 +79,7 @@ function buildHtml(textBody) {
   </head>
   <body style="margin:0;padding:24px;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1d1d1f;">
     <div style="max-width:640px;margin:0 auto;background:#ffffff;border-radius:8px;padding:32px;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
-      <div style="font-size:14px;line-height:1.6;white-space:pre-wrap;word-wrap:break-word;color:#1d1d1f;">${escaped}</div>${logoBlock}
+      <div style="font-size:14px;line-height:1.6;word-wrap:break-word;color:#1d1d1f;">${escaped}</div>${logoBlock}
     </div>
   </body>
 </html>`
